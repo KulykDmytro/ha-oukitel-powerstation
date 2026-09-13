@@ -117,6 +117,20 @@ def _regen_with(body: dict) -> object:
     return asyncio.run(run())
 
 
+def _login_with(body: dict) -> object:
+    """Run login against a fake response; return any error it raises."""
+
+    async def run():
+        client = cloud.OukitelCloud(_FakeSession(body=body), "EU")
+        try:
+            await client.login("user@example.com", "s3cret-pass")
+        except BaseException as err:  # the test inspects whatever escapes
+            return err
+        return None
+
+    return asyncio.run(run())
+
+
 def main() -> None:
     print("cloud login crypto parity tests")
     email = "user@example.com"
@@ -176,6 +190,11 @@ def main() -> None:
     check(
         "password format response -> OukitelCloudPasswordFormatError",
         isinstance(password_err, cloud.OukitelCloudPasswordFormatError),
+    )
+    malformed_login = _login_with({"code": 200, "data": "not-an-object"})
+    check(
+        "malformed login payload -> OukitelCloudResponseError",
+        isinstance(malformed_login, cloud.OukitelCloudResponseError),
     )
 
     # 6) regenerate_auth_key: returns the key, posts pk/dk, errors when absent

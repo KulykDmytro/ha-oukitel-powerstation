@@ -113,7 +113,11 @@ class OukitelCloud:
             email, password, self._region["app_secret"], self._region["user_domain"]
         )
         data = await self._post_form(PATH_LOGIN, fields)
-        token = ((data.get("data") or {}).get("accessToken") or {}).get("token")
+        payload = self._data_object(data, PATH_LOGIN)
+        access_token = payload.get("accessToken") or {}
+        if not isinstance(access_token, dict):
+            raise OukitelCloudResponseError("login returned invalid accessToken")
+        token = access_token.get("token")
         if not token:
             raise OukitelCloudAuthError("login returned no token")
         self._token = token
@@ -122,12 +126,15 @@ class OukitelCloud:
     async def get_devices(self) -> list[dict[str, Any]]:
         """Return the account's devices (each includes pk/dk/authKey/name)."""
         data = await self._get(PATH_DEVICE_LIST, {"pageNumber": "1", "pageSize": "50"})
-        return (data.get("data") or {}).get("list", []) or []
+        devices = self._data_object(data, PATH_DEVICE_LIST).get("list") or []
+        if not isinstance(devices, list) or not all(isinstance(device, dict) for device in devices):
+            raise OukitelCloudResponseError("userDeviceList returned invalid list")
+        return devices
 
     async def get_tsl(self, pk: str) -> dict[str, Any]:
         """Return the product thing-model (data-point dictionary)."""
         data = await self._get(PATH_PRODUCT_TSL, {"pk": pk})
-        return data.get("data") or {}
+        return self._data_object(data, PATH_PRODUCT_TSL)
 
     async def regenerate_auth_key(self, pk: str, dk: str) -> str:
         """Return the CURRENT device authKey (the app's own fetch endpoint).
@@ -140,7 +147,7 @@ class OukitelCloud:
         re-pushes the key the device already has.
         """
         data = await self._post_form(PATH_REGENERATE_AUTH_KEY, {"pk": pk, "dk": dk})
-        auth_key = (data.get("data") or {}).get("authKey")
+        auth_key = self._data_object(data, PATH_REGENERATE_AUTH_KEY).get("authKey")
         if not auth_key:
             raise OukitelCloudError("regenerateAuthKey returned no authKey")
         return str(auth_key)
@@ -153,7 +160,10 @@ class OukitelCloud:
         """
         data = await self._get(PATH_BUSINESS_ATTRS, {"pk": pk, "dk": dk})
         out: dict[int, Any] = {}
-        for item in (data.get("data") or {}).get("customizeTslInfo") or []:
+        items = self._data_object(data, PATH_BUSINESS_ATTRS).get("customizeTslInfo") or []
+        if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
+            raise OukitelCloudResponseError("getDeviceBusinessAttributes returned invalid list")
+        for item in items:
             tag = item.get("abId")
             raw = item.get("resourceValce")
             dtype = item.get("dataType")
@@ -174,6 +184,14 @@ class OukitelCloud:
 
     async def _get(self, path: str, params: dict[str, str]) -> dict[str, Any]:
         return await self._request("GET", path, params=params)
+
+    @staticmethod
+    def _data_object(response: dict[str, Any], endpoint: str) -> dict[str, Any]:
+        """Return an endpoint's object-shaped data payload or raise a cloud error."""
+        payload = response.get("data")
+        if not isinstance(payload, dict):
+            raise OukitelCloudResponseError(f"{endpoint} returned invalid data")
+        return payload
 
     async def _request(self, method: str, path: str, **kwargs: Any) -> dict[str, Any]:
         """Perform one bounded request, mapping transport failures to OukitelCloudError.
