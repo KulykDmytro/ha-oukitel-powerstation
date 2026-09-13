@@ -45,6 +45,22 @@ class OukitelCloudAuthError(OukitelCloudError):
     """Login failed (bad credentials)."""
 
 
+class OukitelCloudConnectionError(OukitelCloudError):
+    """The Quectel cloud could not be reached."""
+
+
+class OukitelCloudTimeoutError(OukitelCloudConnectionError):
+    """The Quectel cloud did not respond before the request deadline."""
+
+
+class OukitelCloudResponseError(OukitelCloudError):
+    """The Quectel cloud returned an unexpected or unsuccessful response."""
+
+
+class OukitelCloudPasswordFormatError(OukitelCloudError):
+    """The cloud rejected the password before attempting authentication."""
+
+
 def _headers(token: str | None = None) -> dict[str, str]:
     h = {
         "X-Q-Language": "en",
@@ -176,18 +192,32 @@ class OukitelCloud:
             ) as resp:
                 return await self._parse(resp)
         except TimeoutError as err:
-            raise OukitelCloudError(f"timed out after {_HTTP_TIMEOUT.total}s: {path}") from err
+            raise OukitelCloudTimeoutError(
+                f"timed out after {_HTTP_TIMEOUT.total}s: {path}"
+            ) from err
         except aiohttp.ClientError as err:
-            raise OukitelCloudError(f"request failed: {err}") from err
+            raise OukitelCloudConnectionError(f"request failed: {err}") from err
 
     @staticmethod
     async def _parse(resp: Any) -> dict[str, Any]:
+        # Some gateways reject invalid credentials with an HTTP status instead
+        # of the normal JSON ``code``. Do not report that as a connection issue.
+        if resp.status in (401, 403):
+            raise OukitelCloudAuthError(f"HTTP {resp.status}")
         if resp.status != 200:
-            raise OukitelCloudError(f"HTTP {resp.status}")
-        body = await resp.json(content_type=None)
+            raise OukitelCloudResponseError(f"HTTP {resp.status}")
+        try:
+            body = await resp.json(content_type=None)
+        except (aiohttp.ClientError, ValueError) as err:
+            raise OukitelCloudResponseError("invalid JSON response") from err
+        if not isinstance(body, dict):
+            raise OukitelCloudResponseError("unexpected JSON response")
         code = body.get("code")
         if code in (401, 4001, 1003):  # auth-ish codes
             raise OukitelCloudAuthError(body.get("msg") or f"code {code}")
         if code not in (200, 0, None):
-            raise OukitelCloudError(body.get("msg") or f"code {code}")
+            message = str(body.get("msg") or f"code {code}")
+            if "password format" in message.casefold():
+                raise OukitelCloudPasswordFormatError(message)
+            raise OukitelCloudResponseError(message)
         return body

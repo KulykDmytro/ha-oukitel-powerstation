@@ -18,7 +18,14 @@ from homeassistant.helpers import selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 import voluptuous as vol
 
-from .cloud import OukitelCloud, OukitelCloudAuthError, OukitelCloudError
+from .cloud import (
+    OukitelCloud,
+    OukitelCloudAuthError,
+    OukitelCloudConnectionError,
+    OukitelCloudError,
+    OukitelCloudPasswordFormatError,
+    OukitelCloudTimeoutError,
+)
 from .const import (
     CLOUD_POLL_INTERVAL_MAX_S,
     CLOUD_POLL_INTERVAL_MIN_S,
@@ -44,6 +51,22 @@ from .product import build_manifest
 from .protocol import OukitelAuthError, OukitelConnection, OukitelError
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _cloud_error_key(err: OukitelCloudError) -> str:
+    """Map cloud failures to an actionable config-flow message."""
+    if isinstance(err, OukitelCloudPasswordFormatError):
+        return "password_format"
+    if isinstance(err, OukitelCloudTimeoutError):
+        return "cloud_timeout"
+    if isinstance(err, OukitelCloudConnectionError):
+        return "cloud_unreachable"
+    return "cloud_response"
+
+
+def _password_length_is_valid(password: str) -> bool:
+    """Return whether the known Quectel password-length requirement is met."""
+    return 6 <= len(password) <= 20
 
 
 def _device_label(device: dict[str, Any]) -> str:
@@ -95,26 +118,30 @@ class OukitelConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
         if user_input is not None:
-            session = async_get_clientsession(self.hass)
-            cloud = OukitelCloud(session, user_input[CONF_REGION])
-            try:
-                await cloud.login(user_input[CONF_EMAIL], user_input[CONF_PASSWORD])
-                self._devices = await cloud.get_devices()
-            except OukitelCloudAuthError:
-                errors["base"] = "invalid_auth"
-            except OukitelCloudError:
-                errors["base"] = "cannot_connect"
+            if not _password_length_is_valid(user_input[CONF_PASSWORD]):
+                errors[CONF_PASSWORD] = "password_length"
             else:
-                if not self._devices:
-                    errors["base"] = "no_devices"
+                session = async_get_clientsession(self.hass)
+                cloud = OukitelCloud(session, user_input[CONF_REGION])
+                try:
+                    await cloud.login(user_input[CONF_EMAIL], user_input[CONF_PASSWORD])
+                    self._devices = await cloud.get_devices()
+                except OukitelCloudAuthError:
+                    errors["base"] = "invalid_auth"
+                except OukitelCloudError as err:
+                    _LOGGER.debug("cloud login or device lookup failed: %s", err)
+                    errors["base"] = _cloud_error_key(err)
                 else:
-                    self._cloud = cloud
-                    self._creds = {
-                        CONF_REGION: user_input[CONF_REGION],
-                        CONF_EMAIL: user_input[CONF_EMAIL],
-                        CONF_PASSWORD: user_input[CONF_PASSWORD],
-                    }
-                    return await self.async_step_device()
+                    if not self._devices:
+                        errors["base"] = "no_devices"
+                    else:
+                        self._cloud = cloud
+                        self._creds = {
+                            CONF_REGION: user_input[CONF_REGION],
+                            CONF_EMAIL: user_input[CONF_EMAIL],
+                            CONF_PASSWORD: user_input[CONF_PASSWORD],
+                        }
+                        return await self.async_step_device()
 
         schema = vol.Schema(
             {
@@ -187,8 +214,9 @@ class OukitelConfigFlow(ConfigFlow, domain=DOMAIN):
                     )
                 except OukitelCloudAuthError:
                     errors["base"] = "invalid_auth"
-                except OukitelCloudError:
-                    errors["base"] = "cannot_connect"
+                except OukitelCloudError as err:
+                    _LOGGER.debug("auth-key refresh failed: %s", err)
+                    errors["base"] = _cloud_error_key(err)
                 else:
                     conn = OukitelConnection(host, auth_key)
                     try:
@@ -236,7 +264,7 @@ class OukitelConfigFlow(ConfigFlow, domain=DOMAIN):
                 return self.async_show_form(
                     step_id="connect_mode",
                     data_schema=_connect_mode_schema(),
-                    errors={"base": "cannot_connect"},
+                    errors={"base": _cloud_error_key(err)},
                 )
             _LOGGER.debug("productTSL fetch failed (bundled fallback): %s", err)
         else:
@@ -269,24 +297,28 @@ class OukitelConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         entry = self._get_reauth_entry()
         if user_input is not None:
-            session = async_get_clientsession(self.hass)
-            cloud = OukitelCloud(session, self._creds[CONF_REGION])
-            try:
-                await cloud.login(self._creds[CONF_EMAIL], user_input[CONF_PASSWORD])
-                auth_key = await cloud.regenerate_auth_key(entry.data[CONF_PK], entry.data[CONF_DK])
-            except OukitelCloudAuthError:
-                errors["base"] = "invalid_auth"
-            except OukitelCloudError:
-                errors["base"] = "cannot_connect"
+            if not _password_length_is_valid(user_input[CONF_PASSWORD]):
+                errors[CONF_PASSWORD] = "password_length"
             else:
-                return self.async_update_reload_and_abort(
-                    entry,
-                    data={
-                        **entry.data,
-                        CONF_PASSWORD: user_input[CONF_PASSWORD],
-                        CONF_AUTH_KEY: auth_key,
-                    },
-                )
+                session = async_get_clientsession(self.hass)
+                cloud = OukitelCloud(session, self._creds[CONF_REGION])
+                try:
+                    await cloud.login(self._creds[CONF_EMAIL], user_input[CONF_PASSWORD])
+                    auth_key = await cloud.regenerate_auth_key(entry.data[CONF_PK], entry.data[CONF_DK])
+                except OukitelCloudAuthError:
+                    errors["base"] = "invalid_auth"
+                except OukitelCloudError as err:
+                    _LOGGER.debug("reauthentication failed: %s", err)
+                    errors["base"] = _cloud_error_key(err)
+                else:
+                    return self.async_update_reload_and_abort(
+                        entry,
+                        data={
+                            **entry.data,
+                            CONF_PASSWORD: user_input[CONF_PASSWORD],
+                            CONF_AUTH_KEY: auth_key,
+                        },
+                    )
         return self.async_show_form(
             step_id="reauth_confirm",
             data_schema=vol.Schema({vol.Required(CONF_PASSWORD): str}),

@@ -53,10 +53,9 @@ def check(name: str, cond: bool) -> None:
 
 
 class _FakeResponse:
-    status = 200
-
-    def __init__(self, body: dict | None = None) -> None:
+    def __init__(self, body: dict | None = None, status: int = 200) -> None:
         self._body = body if body is not None else {"code": 200, "data": {}}
+        self.status = status
 
     async def json(self, content_type: object = None) -> dict:
         return self._body
@@ -65,21 +64,28 @@ class _FakeResponse:
 class _FakeSession:
     """Records request kwargs; optionally raises or serves a canned body."""
 
-    def __init__(self, raises: BaseException | None = None, body: dict | None = None) -> None:
+    def __init__(
+        self,
+        raises: BaseException | None = None,
+        body: dict | None = None,
+        status: int = 200,
+    ) -> None:
         self.raises = raises
         self.body = body
+        self.status = status
         self.kwargs: dict = {}
 
     def request(self, _method: str, _url: str, **kwargs):
         self.kwargs = kwargs
         raises = self.raises
         body = self.body
+        status = self.status
 
         @contextlib.asynccontextmanager
         async def _cm():
             if raises is not None:
                 raise raises
-            yield _FakeResponse(body)
+            yield _FakeResponse(body, status)
 
         return _cm()
 
@@ -148,9 +154,29 @@ def main() -> None:
     check("timeout total is bounded", 0 < (timeout.total or 0) <= 60)
 
     conn_err = _request_with(_FakeSession(aiohttp.ClientConnectionError("no route")))
-    check("ClientError -> OukitelCloudError", isinstance(conn_err, cloud.OukitelCloudError))
+    check(
+        "ClientError -> OukitelCloudConnectionError",
+        isinstance(conn_err, cloud.OukitelCloudConnectionError),
+    )
     to_err = _request_with(_FakeSession(TimeoutError()))
-    check("TimeoutError -> OukitelCloudError", isinstance(to_err, cloud.OukitelCloudError))
+    check(
+        "TimeoutError -> OukitelCloudTimeoutError",
+        isinstance(to_err, cloud.OukitelCloudTimeoutError),
+    )
+    auth_err = _request_with(_FakeSession(status=401))
+    check("HTTP 401 -> OukitelCloudAuthError", isinstance(auth_err, cloud.OukitelCloudAuthError))
+    response_err = _request_with(_FakeSession(status=503))
+    check(
+        "HTTP 503 -> OukitelCloudResponseError",
+        isinstance(response_err, cloud.OukitelCloudResponseError),
+    )
+    password_err = _request_with(
+        _FakeSession(body={"code": 400, "msg": "Password format is incorrect."})
+    )
+    check(
+        "password format response -> OukitelCloudPasswordFormatError",
+        isinstance(password_err, cloud.OukitelCloudPasswordFormatError),
+    )
 
     # 6) regenerate_auth_key: returns the key, posts pk/dk, errors when absent
     key, err = _regen_with({"code": 200, "data": {"authKey": "QUJDREVGRw=="}})
