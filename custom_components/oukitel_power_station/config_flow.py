@@ -304,7 +304,9 @@ class OukitelConfigFlow(ConfigFlow, domain=DOMAIN):
                 cloud = OukitelCloud(session, self._creds[CONF_REGION])
                 try:
                     await cloud.login(self._creds[CONF_EMAIL], user_input[CONF_PASSWORD])
-                    auth_key = await cloud.regenerate_auth_key(entry.data[CONF_PK], entry.data[CONF_DK])
+                    auth_key = await cloud.regenerate_auth_key(
+                        entry.data[CONF_PK], entry.data[CONF_DK]
+                    )
                 except OukitelCloudAuthError:
                     errors["base"] = "invalid_auth"
                 except OukitelCloudError as err:
