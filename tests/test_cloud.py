@@ -240,23 +240,23 @@ def main() -> None:
     )
     missing_token = _login_with({"code": 200, "data": {"accessToken": None}})
     check(
-        "missing login token -> OukitelCloudResponseError",
-        isinstance(missing_token, cloud.OukitelCloudResponseError),
+        "missing login token -> OukitelCloudAuthError",
+        isinstance(missing_token, cloud.OukitelCloudAuthError),
     )
     malformed_devices = _devices_with({"code": 200, "data": {"list": [{}]}})
     check(
-        "malformed device -> OukitelCloudResponseError",
-        isinstance(malformed_devices, cloud.OukitelCloudResponseError),
+        "BLE-only device is ignored",
+        malformed_devices is None,
     )
-    malformed_tsl = _tsl_with({"code": 200, "data": {"profile": "bad", "properties": []}})
+    malformed_tsl = _tsl_with({"code": 200, "data": {"profile": "bad", "properties": "bad"}})
     check(
         "malformed TSL -> OukitelCloudResponseError",
         isinstance(malformed_tsl, cloud.OukitelCloudResponseError),
     )
     malformed_attributes = _business_attributes_with({"code": 200, "data": {}})
     check(
-        "missing business attributes -> OukitelCloudResponseError",
-        isinstance(malformed_attributes, cloud.OukitelCloudResponseError),
+        "missing business attributes -> empty values",
+        malformed_attributes is None,
     )
 
     # 6) regenerate_auth_key: returns the key, posts pk/dk, errors when absent

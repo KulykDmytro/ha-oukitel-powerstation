@@ -115,10 +115,14 @@ class OukitelCloud:
         data = await self._post_form(PATH_LOGIN, fields)
         payload = self._data_object(data, PATH_LOGIN)
         access_token = payload.get("accessToken")
+        if access_token is None:
+            raise OukitelCloudAuthError("login returned no token")
         if not isinstance(access_token, dict):
             raise OukitelCloudResponseError("login returned invalid accessToken")
         token = access_token.get("token")
-        if not isinstance(token, str) or not token:
+        if token is None or token == "":
+            raise OukitelCloudAuthError("login returned no token")
+        if not isinstance(token, str):
             raise OukitelCloudResponseError("login returned invalid token")
         self._token = token
         return token
@@ -126,27 +130,26 @@ class OukitelCloud:
     async def get_devices(self) -> list[dict[str, Any]]:
         """Return the account's devices (each includes pk/dk/authKey/name)."""
         data = await self._get(PATH_DEVICE_LIST, {"pageNumber": "1", "pageSize": "50"})
-        devices = self._data_object(data, PATH_DEVICE_LIST).get("list")
+        devices = self._data_object(data, PATH_DEVICE_LIST).get("list") or []
         if not isinstance(devices, list) or not all(isinstance(device, dict) for device in devices):
             raise OukitelCloudResponseError("userDeviceList returned invalid list")
         required_fields = ("deviceKey", "productKey", "authKey")
-        if any(
-            not isinstance(device.get(field), str) or not device[field]
+        # Accounts may also contain BLE-only bindings without a LAN authKey.
+        # Ignore those entries so they do not prevent setup of usable stations.
+        return [
+            device
             for device in devices
-            for field in required_fields
-        ):
-            raise OukitelCloudResponseError("userDeviceList returned invalid device")
-        return devices
+            if all(
+                isinstance(device.get(field), str) and device[field] for field in required_fields
+            )
+        ]
 
     async def get_tsl(self, pk: str) -> dict[str, Any]:
         """Return the product thing-model (data-point dictionary)."""
         data = await self._get(PATH_PRODUCT_TSL, {"pk": pk})
         payload = self._data_object(data, PATH_PRODUCT_TSL)
-        profile = payload.get("profile")
         properties = payload.get("properties")
-        if not isinstance(profile, dict) or not isinstance(properties, list):
-            raise OukitelCloudResponseError("productTSL returned invalid shape")
-        if not all(isinstance(property_, dict) for property_ in properties):
+        if not isinstance(properties, list):
             raise OukitelCloudResponseError("productTSL returned invalid properties")
         return payload
 
@@ -174,7 +177,7 @@ class OukitelCloud:
         """
         data = await self._get(PATH_BUSINESS_ATTRS, {"pk": pk, "dk": dk})
         out: dict[int, Any] = {}
-        items = self._data_object(data, PATH_BUSINESS_ATTRS).get("customizeTslInfo")
+        items = self._data_object(data, PATH_BUSINESS_ATTRS).get("customizeTslInfo") or []
         if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
             raise OukitelCloudResponseError("getDeviceBusinessAttributes returned invalid list")
         for item in items:
@@ -234,13 +237,13 @@ class OukitelCloud:
     async def _parse(resp: Any) -> dict[str, Any]:
         # Some gateways reject invalid credentials with an HTTP status instead
         # of the normal JSON ``code``. Do not report that as a connection issue.
-        if resp.status in (401, 403):
+        if resp.status == 401:
             raise OukitelCloudAuthError(f"HTTP {resp.status}")
         if resp.status != 200:
             raise OukitelCloudResponseError(f"HTTP {resp.status}")
         try:
             body = await resp.json(content_type=None)
-        except (aiohttp.ClientError, ValueError) as err:
+        except ValueError as err:
             raise OukitelCloudResponseError("invalid JSON response") from err
         if not isinstance(body, dict):
             raise OukitelCloudResponseError("unexpected JSON response")

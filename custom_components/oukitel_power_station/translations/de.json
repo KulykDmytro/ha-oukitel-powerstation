@@ -2,7 +2,6 @@
   "config": {
     "error": {
       "invalid_auth": "Ungültige Zugangsdaten.",
-      "password_length": "Das Passwort muss 6 bis 20 Zeichen lang sein.",
       "password_format": "Die Quectel-Cloud hat dieses Passwortformat abgelehnt. Es muss 6 bis 20 Zeichen lang sein und Buchstaben sowie Zahlen oder Sonderzeichen enthalten.",
       "cannot_connect": "Verbindung zur Station nicht möglich. Prüfe die IP-Adresse und ob Home Assistant den TCP-Port 6607 erreichen kann.",
       "cloud_timeout": "Die Quectel-Cloud hat nicht rechtzeitig geantwortet. Prüfe die Internetverbindung und versuche es erneut.",

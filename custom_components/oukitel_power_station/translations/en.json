@@ -43,7 +43,6 @@
     },
     "error": {
       "invalid_auth": "Invalid credentials.",
-      "password_length": "Password must be 6-20 characters.",
       "password_format": "The Quectel cloud rejected this password format. It must be 6-20 characters and contain letters plus numbers or special characters.",
       "cannot_connect": "Could not connect to the station. Check its IP address and that Home Assistant can reach TCP port 6607.",
       "cloud_timeout": "The Quectel cloud did not respond. Check your Internet connection and try again.",
