@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.1](https://github.com/bordeux/ha-oukitel-powerstation/compare/v0.5.0...v0.5.1) (2026-09-13)
+
+
+### Bug Fixes
+
+* correct the p11uve model name to P1500E Plus ([0851214](https://github.com/bordeux/ha-oukitel-powerstation/commit/0851214cebed06c9f8593291e8c80632520928c3))
+* correct the p11uve model name to P1500E Plus ([715be92](https://github.com/bordeux/ha-oukitel-powerstation/commit/715be922edb8f500d18924f5c187a0340598a06b))
+
 ## [0.5.0](https://github.com/bordeux/ha-oukitel-powerstation/compare/v0.4.0...v0.5.0) (2026-09-12)
 
 
