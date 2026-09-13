@@ -131,6 +131,48 @@ def _login_with(body: dict) -> object:
     return asyncio.run(run())
 
 
+def _devices_with(body: dict) -> object:
+    """Run get_devices against a fake response; return any error it raises."""
+
+    async def run():
+        client = cloud.OukitelCloud(_FakeSession(body=body), "EU")
+        try:
+            await client.get_devices()
+        except BaseException as err:  # the test inspects whatever escapes
+            return err
+        return None
+
+    return asyncio.run(run())
+
+
+def _tsl_with(body: dict) -> object:
+    """Run get_tsl against a fake response; return any error it raises."""
+
+    async def run():
+        client = cloud.OukitelCloud(_FakeSession(body=body), "EU")
+        try:
+            await client.get_tsl("p11wN7")
+        except BaseException as err:  # the test inspects whatever escapes
+            return err
+        return None
+
+    return asyncio.run(run())
+
+
+def _business_attributes_with(body: dict) -> object:
+    """Run get_business_attributes against a fake response; return any error it raises."""
+
+    async def run():
+        client = cloud.OukitelCloud(_FakeSession(body=body), "EU")
+        try:
+            await client.get_business_attributes("p11wN7", "aabbccddeeff")
+        except BaseException as err:  # the test inspects whatever escapes
+            return err
+        return None
+
+    return asyncio.run(run())
+
+
 def main() -> None:
     print("cloud login crypto parity tests")
     email = "user@example.com"
@@ -196,12 +238,40 @@ def main() -> None:
         "malformed login payload -> OukitelCloudResponseError",
         isinstance(malformed_login, cloud.OukitelCloudResponseError),
     )
+    missing_token = _login_with({"code": 200, "data": {"accessToken": None}})
+    check(
+        "missing login token -> OukitelCloudResponseError",
+        isinstance(missing_token, cloud.OukitelCloudResponseError),
+    )
+    malformed_devices = _devices_with({"code": 200, "data": {"list": [{}]}})
+    check(
+        "malformed device -> OukitelCloudResponseError",
+        isinstance(malformed_devices, cloud.OukitelCloudResponseError),
+    )
+    malformed_tsl = _tsl_with({"code": 200, "data": {"profile": "bad", "properties": []}})
+    check(
+        "malformed TSL -> OukitelCloudResponseError",
+        isinstance(malformed_tsl, cloud.OukitelCloudResponseError),
+    )
+    malformed_attributes = _business_attributes_with({"code": 200, "data": {}})
+    check(
+        "missing business attributes -> OukitelCloudResponseError",
+        isinstance(malformed_attributes, cloud.OukitelCloudResponseError),
+    )
 
     # 6) regenerate_auth_key: returns the key, posts pk/dk, errors when absent
     key, err = _regen_with({"code": 200, "data": {"authKey": "QUJDREVGRw=="}})
     check("regenerate returns authKey", key == "QUJDREVGRw==" and err is None)
     _, err = _regen_with({"code": 200, "data": {}})
-    check("regenerate without key -> OukitelCloudError", isinstance(err, cloud.OukitelCloudError))
+    check(
+        "regenerate without key -> OukitelCloudResponseError",
+        isinstance(err, cloud.OukitelCloudResponseError),
+    )
+    _, err = _regen_with({"code": 200, "data": {"authKey": 42}})
+    check(
+        "regenerate numeric key -> OukitelCloudResponseError",
+        isinstance(err, cloud.OukitelCloudResponseError),
+    )
 
     print(f"\nALL PASSED ({_passed} checks)")
 

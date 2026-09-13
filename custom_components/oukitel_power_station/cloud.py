@@ -114,27 +114,41 @@ class OukitelCloud:
         )
         data = await self._post_form(PATH_LOGIN, fields)
         payload = self._data_object(data, PATH_LOGIN)
-        access_token = payload.get("accessToken") or {}
+        access_token = payload.get("accessToken")
         if not isinstance(access_token, dict):
             raise OukitelCloudResponseError("login returned invalid accessToken")
         token = access_token.get("token")
-        if not token:
-            raise OukitelCloudAuthError("login returned no token")
+        if not isinstance(token, str) or not token:
+            raise OukitelCloudResponseError("login returned invalid token")
         self._token = token
         return token
 
     async def get_devices(self) -> list[dict[str, Any]]:
         """Return the account's devices (each includes pk/dk/authKey/name)."""
         data = await self._get(PATH_DEVICE_LIST, {"pageNumber": "1", "pageSize": "50"})
-        devices = self._data_object(data, PATH_DEVICE_LIST).get("list") or []
+        devices = self._data_object(data, PATH_DEVICE_LIST).get("list")
         if not isinstance(devices, list) or not all(isinstance(device, dict) for device in devices):
             raise OukitelCloudResponseError("userDeviceList returned invalid list")
+        required_fields = ("deviceKey", "productKey", "authKey")
+        if any(
+            not isinstance(device.get(field), str) or not device[field]
+            for device in devices
+            for field in required_fields
+        ):
+            raise OukitelCloudResponseError("userDeviceList returned invalid device")
         return devices
 
     async def get_tsl(self, pk: str) -> dict[str, Any]:
         """Return the product thing-model (data-point dictionary)."""
         data = await self._get(PATH_PRODUCT_TSL, {"pk": pk})
-        return self._data_object(data, PATH_PRODUCT_TSL)
+        payload = self._data_object(data, PATH_PRODUCT_TSL)
+        profile = payload.get("profile")
+        properties = payload.get("properties")
+        if not isinstance(profile, dict) or not isinstance(properties, list):
+            raise OukitelCloudResponseError("productTSL returned invalid shape")
+        if not all(isinstance(property_, dict) for property_ in properties):
+            raise OukitelCloudResponseError("productTSL returned invalid properties")
+        return payload
 
     async def regenerate_auth_key(self, pk: str, dk: str) -> str:
         """Return the CURRENT device authKey (the app's own fetch endpoint).
@@ -148,9 +162,9 @@ class OukitelCloud:
         """
         data = await self._post_form(PATH_REGENERATE_AUTH_KEY, {"pk": pk, "dk": dk})
         auth_key = self._data_object(data, PATH_REGENERATE_AUTH_KEY).get("authKey")
-        if not auth_key:
-            raise OukitelCloudError("regenerateAuthKey returned no authKey")
-        return str(auth_key)
+        if not isinstance(auth_key, str) or not auth_key:
+            raise OukitelCloudResponseError("regenerateAuthKey returned invalid authKey")
+        return auth_key
 
     async def get_business_attributes(self, pk: str, dk: str) -> dict[int, Any]:
         """Return current scalar property values from the cloud as {tag_id: value}.
@@ -160,7 +174,7 @@ class OukitelCloud:
         """
         data = await self._get(PATH_BUSINESS_ATTRS, {"pk": pk, "dk": dk})
         out: dict[int, Any] = {}
-        items = self._data_object(data, PATH_BUSINESS_ATTRS).get("customizeTslInfo") or []
+        items = self._data_object(data, PATH_BUSINESS_ATTRS).get("customizeTslInfo")
         if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
             raise OukitelCloudResponseError("getDeviceBusinessAttributes returned invalid list")
         for item in items:
