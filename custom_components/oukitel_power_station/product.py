@@ -57,7 +57,7 @@ KNOWN_PRODUCTS: dict[str, dict[str, Any]] = {
         # IEE P2400 and P3200
         "manufacturer": "IEE",
         "model": "P2400/P3200",
-        "excluded_tags": (),
+        "excluded_tags": (34,),
     },
 }
 
