@@ -51,7 +51,7 @@ class OukitelEntity(CoordinatorEntity[OukitelCoordinator]):
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, dk)},
             name=coordinator.config_entry.data.get(CONF_NAME) or "Oukitel Power Station",
-            manufacturer=MANUFACTURER,
+            manufacturer=manifest.manufacturer or MANUFACTURER,
             model=manifest.model or DEFAULT_MODEL,
             model_id=manifest.product_key or None,
             connections={("mac", dk)} if len(dk) == 12 else set(),

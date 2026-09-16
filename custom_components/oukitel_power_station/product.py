@@ -34,7 +34,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from .const import CLOUD_ONLY_TAGS, DEFAULT_MODEL, READ_TAG_IDS
+from .const import CLOUD_ONLY_TAGS, DEFAULT_MODEL, MANUFACTURER, READ_TAG_IDS
 from .tsl import parse_tsl
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,6 +53,12 @@ KNOWN_PRODUCTS: dict[str, dict[str, Any]] = {
         "model": DEFAULT_MODEL,
         "excluded_tags": (),
     },
+    "p11wDf": {
+        # IEE P2400 and P3200
+        "manufacturer": "IEE",
+        "model": "P2400/P3200",
+        "excluded_tags": (34,),
+    },
 }
 
 
@@ -67,6 +73,7 @@ class ProductManifest:
     tags: dict[int, dict[str, Any]]
     code_to_tag: dict[str, int]
     excluded_tags: tuple[int, ...] = field(default_factory=tuple)
+    manufacturer: str = MANUFACTURER
 
     # --- queries the platforms/coordinator rely on ---------------------------
     def has_tag(self, tag: int) -> bool:
@@ -190,5 +197,6 @@ def resolve_manifest(
     return replace(
         manifest,
         model=str(known.get("model") or manifest.product_key or "unknown"),
+        manufacturer=str(known.get("manufacturer") or MANUFACTURER),
         excluded_tags=tuple(known.get("excluded_tags") or ()),
     )

@@ -39,6 +39,7 @@ manifest_from_bundled = product_mod.manifest_from_bundled
 resolve_manifest = product_mod.resolve_manifest
 parse_tsl = tsl.parse_tsl
 READ_TAG_IDS = const.READ_TAG_IDS
+MANUFACTURER = const.MANUFACTURER
 
 TSL_DIR = BASE / "tsl"
 
@@ -53,6 +54,8 @@ TAG_TEMP = 14
 TAG_CHARGE_LIMIT = 20
 TAG_FREQUENCY = 27
 TAG_VOLTAGE = 28
+TAG_INVERTER_TEMP = 33
+TAG_ID34 = 34  # BMS_Version on p11wN7/p11uve, LED_Ste on p11wDf
 TAG_USB_SWITCH = 44
 TAG_AC_SWITCH = 43
 
@@ -65,6 +68,11 @@ def p1500_tsl() -> dict:
 @pytest.fixture
 def p2001e_tsl() -> dict:
     return json.loads((TSL_DIR / "p11wN7.json").read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def p2400_tsl() -> dict:
+    return json.loads((TSL_DIR / "p11wDf.json").read_text(encoding="utf-8"))
 
 
 # --- tsl.py -----------------------------------------------------------------
@@ -135,25 +143,40 @@ def test_parse_tolerates_garbage():
 
 
 # --- product.py --------------------------------------------------------------
-def test_build_manifest_known_products(p1500_tsl, p2001e_tsl):
+def test_build_manifest_known_products(p1500_tsl, p2001e_tsl, p2400_tsl):
     m1500 = resolve_manifest("p11uve", cloud_tsl=p1500_tsl)
     assert m1500 is not None
     assert m1500.product_key == "p11uve"
     assert m1500.model == "P1500E Plus"
     assert m1500.excluded_tags == (TAG_REMAIN_TIME, TAG_REMAIN_CHARGING_TIME)
+    # No curated manufacturer -> integration default.
+    assert m1500.manufacturer == MANUFACTURER
 
     m2001e = resolve_manifest("p11wN7", cloud_tsl=p2001e_tsl)
     assert m2001e is not None
     assert m2001e.product_key == "p11wN7"
     assert m2001e.model == "P2001E Plus"
     assert m2001e.excluded_tags == ()
+    assert m2001e.manufacturer == MANUFACTURER
+
+    # p11wDf (IEE P2400/P3200): curated manufacturer + inverter temp (tag 33).
+    m2400 = resolve_manifest("p11wDf", cloud_tsl=p2400_tsl)
+    assert m2400 is not None
+    assert m2400.product_key == "p11wDf"
+    assert m2400.model == KNOWN_PRODUCTS["p11wDf"]["model"]
+    assert m2400.manufacturer == "IEE"
+    assert m2400.has_tag(TAG_INVERTER_TEMP)
+    assert m2400.tag_spec(TAG_INVERTER_TEMP)["unit"] == "℃"
+    # id 34 is LED_Ste here; excluded (still in TSL) so bms_version can't bind it.
+    assert m2400.excluded_tags == (TAG_ID34,)
+    assert TAG_ID34 in m2400.tags
+    assert not m2400.has_tag(TAG_ID34)
 
 
 def test_known_products_cover_bundled_snapshots():
-    for pk in ("p11uve", "p11wN7"):
-        assert pk in KNOWN_PRODUCTS
+    for pk in KNOWN_PRODUCTS:
         manifest = manifest_from_bundled(pk)
-        assert manifest is not None
+        assert manifest is not None, f"{pk} in KNOWN_PRODUCTS but has no bundled TSL"
         assert manifest.product_key == pk
 
 
@@ -230,5 +253,12 @@ def test_resolve_manifest_priority(p1500_tsl):
     resolved = resolve_manifest("pkNew", cloud_tsl=p1500_tsl)
     assert resolved is not None
     assert resolved.product_key == "p11uve"  # taken from the TSL payload
+    assert resolved.manufacturer == MANUFACTURER  # no override -> default
+    # snapshots carry no manufacturer field; resolve re-applies the override
+    p2400_snapshot = manifest_from_bundled("p11wDf").to_dict()
+    assert "manufacturer" not in p2400_snapshot
+    resolved = resolve_manifest("p11wDf", snapshot=p2400_snapshot)
+    assert resolved is not None
+    assert resolved.manufacturer == "IEE"
     # nothing available -> None
     assert resolve_manifest("pkUnknown") is None
