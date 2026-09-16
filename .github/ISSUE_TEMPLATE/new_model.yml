@@ -1,0 +1,83 @@
+name: Support a new station model
+description: Your WonderFree / Quectel power station is not one of the supported models.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Models are described by a manifest derived from the product's thing model (TSL), so adding one
+        is mostly a matter of dropping in its `productTSL` snapshot plus any verified quirks. The
+        integration already fetches that snapshot live for unknown products, so **it may work for you
+        already** — please try setting it up first and tell us how far it got.
+
+  - type: input
+    id: model
+    attributes:
+      label: Model name
+      description: As printed on the unit or shown in the WonderFree app.
+      placeholder: "OUKITEL P5000 Pro"
+    validations:
+      required: true
+
+  - type: input
+    id: product_key
+    attributes:
+      label: Product key (pk)
+      description: >
+        From the diagnostics download if setup succeeded, otherwise from the WonderFree app's device
+        information. This is the single most useful field here.
+      placeholder: "p11wN7"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: How far did setup get?
+      options:
+        - Cloud login and device list worked, entities were created
+        - Cloud login worked, but the station was not found on the LAN
+        - Entities were created but most are unavailable or wrong
+        - Setup failed entirely
+        - Have not tried yet
+    validations:
+      required: true
+
+  - type: textarea
+    id: entities
+    attributes:
+      label: What works and what does not?
+      description: >
+        Which sensors report plausible values, which stay unavailable, and whether the controls
+        (AC / USB / DC output) actually switch the station.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug log from setup
+      description: |
+        Developer Tools → Actions → `logger.set_level`:
+
+        ```yaml
+        action: logger.set_level
+        data:
+          custom_components.oukitel_power_station: debug
+        ```
+
+        Then add the integration and paste the `oukitel_power_station` lines.
+      render: shell
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >
+        If setup got far enough, attach the diagnostics download. It contains the resolved product
+        manifest and the raw tag map, which is exactly what is needed to add a model properly.
+
+  - type: checkboxes
+    id: testing
+    attributes:
+      label: Testing
+      options:
+        - label: I can test a development version against my station

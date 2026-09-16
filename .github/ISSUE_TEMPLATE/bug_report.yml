@@ -1,0 +1,160 @@
+name: Bug report
+description: Something is not working — entities unavailable, wrong values, setup fails, controls do nothing.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this.
+
+        **Two things worth checking first — they explain most reports:**
+
+        1. **The station needs internet access.** Blocking it from the internet (firewall rule, VLAN,
+           Pi-hole) stops it streaming telemetry over the LAN entirely. It still answers the handshake
+           and accepts commands, so it looks perfectly healthy while every sensor goes unavailable.
+           See [#6](https://github.com/bordeux/ha-oukitel-powerstation/issues/6).
+        2. **Update to the latest version** and check whether it still happens.
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      description: HACS, or `version` in `custom_components/oukitel_power_station/manifest.json`.
+      placeholder: "0.5.1"
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      description: Settings → About.
+      placeholder: "2026.9.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: model
+    attributes:
+      label: Station model
+      options:
+        - OUKITEL P2001E Plus
+        - OUKITEL P1500E Plus
+        - Other / not listed
+    validations:
+      required: true
+
+  - type: input
+    id: product_key
+    attributes:
+      label: Product key (pk)
+      description: >
+        From the diagnostics download, or the WonderFree app. Only needed if you picked
+        "Other / not listed" above.
+      placeholder: "p11wN7"
+
+  - type: dropdown
+    id: connection
+    attributes:
+      label: How is the station connected?
+      options:
+        - Local (LAN) — the normal setup
+        - Cloud-only — set up without a LAN address
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: internet
+    attributes:
+      label: Does the station have unrestricted internet access?
+      description: >
+        Firewall rules, IoT VLANs and DNS blocking all count as restricted. This is not optional
+        for the station — see the note at the top.
+      options:
+        - "Yes — no restrictions"
+        - "No — it is blocked or firewalled"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: What is going wrong?
+      options:
+        - Entities are unavailable
+        - Values are frozen / stop updating
+        - Values are wrong or implausible
+        - Setup or reauthentication fails
+        - Controls (switch / select / number) do nothing
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What you saw, what you expected, and how to reproduce it if you can.
+    validations:
+      required: true
+
+  - type: textarea
+    id: regression
+    attributes:
+      label: Did it work before?
+      description: >
+        If this started after an update, which version were you on before? That single answer often
+        narrows it down immediately.
+
+  - type: checkboxes
+    id: options
+    attributes:
+      label: Which options are enabled?
+      description: Settings → Devices & Services → Oukitel Power Station → Configure.
+      options:
+        - label: Fetch temperature & voltage from the cloud
+        - label: Enable device control
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug log
+      description: |
+        Enable debug logging **before** reproducing the problem, since turning it on reloads the
+        integration and will clear a stuck state.
+
+        Without restarting — Developer Tools → Actions → `logger.set_level`:
+
+        ```yaml
+        action: logger.set_level
+        data:
+          custom_components.oukitel_power_station: debug
+        ```
+
+        Then reproduce, and paste the `oukitel_power_station` lines here. Redact your IP if you like;
+        please leave timestamps intact.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >
+        Settings → Devices & Services → Oukitel Power Station → ⋮ → Download diagnostics, then attach
+        or paste it here. Credentials and keys are redacted automatically. It carries connection
+        health (last report age, reconnect count, frame counts) that usually answers the first three
+        questions we would otherwise have to ask.
+
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and this is not a duplicate
+          required: true
+        - label: I am on the latest version, or have said above which version I am on
+          required: true

@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest an entity, option or behaviour that would make the integration more useful.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is the problem?
+      description: What are you trying to do that the integration makes hard or impossible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Station model
+      placeholder: "OUKITEL P2001E Plus"
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Anything you have tried already
+      description: >
+        Template sensors, automations, the WonderFree app — knowing the workaround often shapes the
+        right feature.
