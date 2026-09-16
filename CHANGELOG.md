@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/bordeux/ha-oukitel-powerstation/compare/v0.5.1...v0.6.0) (2026-09-16)
+
+
+### Features
+
+* add inverter temp for IEE P2400/P3200 ([5601b0e](https://github.com/bordeux/ha-oukitel-powerstation/commit/5601b0e24a01bcfe883dd72579e8355a3829cf01))
+* Add inverter temp for IEE P2400/P3200 ([32c5a2d](https://github.com/bordeux/ha-oukitel-powerstation/commit/32c5a2d83f0566c5bb6c905c69d50610ff626761))
+* add manufacturer override ([aba5137](https://github.com/bordeux/ha-oukitel-powerstation/commit/aba51375f09797724cd8654abc83394dbb0e9449))
+* exclude LED tag 34 on p11wDf so bms_version can't bind it ([afca8c6](https://github.com/bordeux/ha-oukitel-powerstation/commit/afca8c6c7d60317caa28233f7f5dd38aa89f835e))
+
+
+### Bug Fixes
+
+* improve cloud login error feedback ([fa10a22](https://github.com/bordeux/ha-oukitel-powerstation/commit/fa10a22615760fce3d9671a5a2ff84fc32f2bb87))
+
 ## [0.5.1](https://github.com/bordeux/ha-oukitel-powerstation/compare/v0.5.0...v0.5.1) (2026-09-13)
 
 
