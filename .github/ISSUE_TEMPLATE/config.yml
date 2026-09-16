@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Setup, options and troubleshooting
+    url: https://github.com/bordeux/ha-oukitel-powerstation#readme
+    about: Installation, the available options, cloud-only mode and the common failure modes.
+  - name: Protocol and reverse-engineering notes
+    url: https://github.com/bordeux/ha-oukitel-powerstation/blob/master/REVERSE_ENGINEERING.md
+    about: How the local protocol works, the tag map, and verified device behaviour.
