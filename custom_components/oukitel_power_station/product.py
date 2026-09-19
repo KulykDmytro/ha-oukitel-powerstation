@@ -45,7 +45,8 @@ _TSL_DIR = Path(__file__).parent / "tsl"
 # productName from userDeviceList wins when it is available.
 KNOWN_PRODUCTS: dict[str, dict[str, Any]] = {
     "p11uve": {
-        "model": "P1500E Plus",
+        # Shared key: Oukitel P1500E Plus and P1000 Plus.
+        "model": "P1500E Plus / P1000 Plus",
         # Pinned to 5940 by this firmware (verified live) — useless sensors.
         "excluded_tags": (2, 3),
     },
